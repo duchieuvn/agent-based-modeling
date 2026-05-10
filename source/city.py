@@ -21,7 +21,32 @@ class CityMap:
         self._graph = None
 
     def _generate_random_streets(self, prob_street=0.6) -> np.ndarray:
-        return self.rng.random((self.height, self.width)) < prob_street
+        # Generate horizontal and vertical streets per user's rules:
+        # - Even rows/cols: guaranteed street (prob=1.0)
+        # - Odd rows/cols: prob=0.25
+        # - Each chosen street is a contiguous segment with random length
+        #   and minimum length >= 50% of the map dimension.
+        street = np.zeros((self.height, self.width), dtype=bool)
+
+        # Horizontal streets (rows)
+        min_hlen = int(np.ceil(0.5 * self.width))
+        for r in range(self.height):
+            p = 1.0 if (r % 3 == 0) else 0.15
+            if self.rng.random() < p:
+                length = int(self.rng.integers(min_hlen, self.width + 1))
+                start = int(self.rng.integers(0, self.width - length + 1))
+                street[r, start:start + length] = True
+
+        # Vertical streets (columns)
+        min_vlen = int(np.ceil(0.3 * self.height))
+        for c in range(self.width):
+            p = 0.7 if (c % 2 == 0) else 0.15
+            if self.rng.random() < p:
+                length = int(self.rng.integers(min_vlen, self.height + 1))
+                start = int(self.rng.integers(0, self.height - length + 1))
+                street[start:start + length, c] = True
+
+        return street
 
     def add_bin(self, coord: Coord, capacity: int = 50):
         self.bins[coord] = {'capacity': capacity, 'load': 0}
