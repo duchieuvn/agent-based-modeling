@@ -22,8 +22,8 @@ def run_ui(steps: int = 100, width: int = 40, height: int = 40, humans: int = 50
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--steps', type=int, default=200)
-    p.add_argument('--width', type=int, default=40)
-    p.add_argument('--height', type=int, default=40)
+    p.add_argument('--width', type=int, default=60)
+    p.add_argument('--height', type=int, default=60)
     p.add_argument('--humans', type=int, default=50)
     p.add_argument('--seed', type=int, default=None)
     p.add_argument('--no-ui', action='store_true', help='Run the original headless console loop.')
