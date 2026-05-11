@@ -17,6 +17,17 @@ class Animator:
         self._agents_scatter = None
         self._title = None
 
+    def _get_bin_color(self, load_ratio):
+        """Return color based on bin load percentage."""
+        if load_ratio < 0.5:
+            return "green"
+        elif load_ratio < 0.8:
+            return "yellow"
+        elif load_ratio < 1.0:
+            return "purple"
+        else:
+            return "red"
+
     def _ensure_axes(self):
         if self.fig is not None and self.ax is not None:
             return
@@ -61,11 +72,14 @@ class Animator:
             xs = [c for (r, c, capacity, load) in bins]
             ys = [r for (r, c, capacity, load) in bins]
             sizes = [max(30, 35 + 170 * (load / max(1, capacity))) for (r, c, capacity, load) in bins]
+            colors = [self._get_bin_color(load / max(1, capacity)) for (r, c, capacity, load) in bins]
             self._bins_scatter.set_offsets(np.column_stack([xs, ys]))
             self._bins_scatter.set_sizes(sizes)
+            self._bins_scatter.set_color(colors)
         else:
             self._bins_scatter.set_offsets(np.empty((0, 2)))
             self._bins_scatter.set_sizes([])
+            self._bins_scatter.set_color([])
 
         agents = state.get("agents", [])
         agent_positions = []

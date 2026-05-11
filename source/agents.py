@@ -6,7 +6,7 @@ Coord = Tuple[int, int]
 class LocalAgent(Agent):
     """Simple human that moves randomly on streets and occasionally litters."""
 
-    def __init__(self, model, p_litter: float = 0.03, keep_direction_prob: float = 0.65, max_wander_distance: Optional[int] = None):
+    def __init__(self, model, p_litter: float = 0.7, keep_direction_prob: float = 0.65, max_wander_distance: Optional[int] = None):
         super().__init__(model)
         self.init_pos = model.city.random_passable_cell()
         self.pos = self.init_pos
