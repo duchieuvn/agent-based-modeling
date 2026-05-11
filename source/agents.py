@@ -39,6 +39,18 @@ class LocalAgent(Agent):
 
             self.direction = (next_pos[0] - self.pos[0], next_pos[1] - self.pos[1])
             self.pos = next_pos
-        # possibly generate waste
+            
+        # If a bin is close enough, deposit there; otherwise litter on the street.
+        nearby_bin = None
+        nearby_distance = None
+        for bin_coord in self.model.city.bins.keys():
+            distance = self._manhattan(self.pos, bin_coord)
+            if distance <= 3 and (nearby_distance is None or distance < nearby_distance):
+                nearby_bin = bin_coord
+                nearby_distance = distance
+
         if self.random.random() < self.p_litter:
-            self.model.city.add_waste(self.pos, 1)
+            if nearby_bin is not None:
+                self.model.city.deposit_to_bin(nearby_bin, 1)
+            else:
+                self.model.city.add_waste(self.pos, 1)
