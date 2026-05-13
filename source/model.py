@@ -1,9 +1,9 @@
 from mesa import Model
 from city import CityMap
-from agents import LocalAgent
+from agents import LocalAgent, TouristAgent
 from bins import Bin
 import numpy as np
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any
 
 
 class CityModel(Model):
@@ -18,6 +18,7 @@ class CityModel(Model):
             self.city.add_bin(coord, capacity=100)
         # create human agents using Mesa 3.5.1 factory method
         LocalAgent.create_agents(model=self, n=n_humans)
+        TouristAgent.create_agents(model=self, n=n_humans // 2)
 
     def step(self):
         # Mesa 3.5.1: random activation via shuffle_do
