@@ -46,7 +46,15 @@ class CityMap:
                 start = int(self.rng.integers(0, self.height - length + 1))
                 street[start:start + length, c] = True
 
+        def place_center_hall(street, center_size):
+            # Always reserve a dense city center block.
+            center_r = (self.height - center_size) // 2
+            center_c = (self.width - center_size) // 2
+            street[center_r:center_r + center_size, center_c:center_c + center_size] = True
+
+        place_center_hall(street, min(11, self.height, self.width))
         return street
+
 
     def add_bin(self, coord: Coord, capacity: int = 50):
         self.bins[coord] = {'capacity': capacity, 'load': 0}

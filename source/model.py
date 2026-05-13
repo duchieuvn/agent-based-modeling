@@ -1,13 +1,13 @@
 from mesa import Model
 from city import CityMap
-from agents import HumanAgent
+from agents import LocalAgent
 from bins import Bin
 import numpy as np
 from typing import Dict, List, Any, Tuple
 
 
 class CityModel(Model):
-    def __init__(self, width: int = 20, height: int = 20, n_humans: int = 20, seed: int = None):
+    def __init__(self, width: int = 50, height: int = 50, n_humans: int = 20, seed: int = None):
         super().__init__(seed=seed)
         self.width = width
         self.height = height
@@ -17,7 +17,7 @@ class CityModel(Model):
             coord = self.city.random_passable_cell()
             self.city.add_bin(coord, capacity=100)
         # create human agents using Mesa 3.5.1 factory method
-        HumanAgent.create_agents(model=self, n=n_humans)
+        LocalAgent.create_agents(model=self, n=n_humans)
 
     def step(self):
         # Mesa 3.5.1: random activation via shuffle_do
