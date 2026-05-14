@@ -162,21 +162,66 @@ class TruckAgent(Agent):
         self.path = best_path
 
         return best_bin
+    
     def plan_path_to(self, destination: Coord) -> None:
         """Calculate and store a path to the destination."""
-        pass
+        self.path = self.model.city.shortest_path(self.pos, destination)
 
     def move_along_path(self) -> None:
         """Move along the stored path according to truck speed."""
-        pass
+        if not self.path:
+            return
+        
+        if self.path[0] == self.pos:
+            self.path.pop(0)
+
+        for _ in range(self.speed):
+            if not self.path:
+                break
+
+            self.pos = self.path.pop(0)
 
     def collect_from_target_bin(self) -> None:
         """Collect waste from the target bin into the truck."""
-        pass
+        if self.target_bin == None:
+            return
+        
+        if not self.at_target_bin():
+            return
+        
+        bin_info = self.model.city.bins.get(self.target_bin)
+
+        if bin_info is None:
+            self.clear_target()
+
+        available = bin_info.get("load", 0)
+        space = self.remaining_capacity()
+
+        if available <= 0 or space <= 0:
+            return
+
+        collected = min(available, space)
+
+        bin_info["load"] -= collected
+
+        self.load += collected 
+
+        if bin_info["load"] <= 0:
+            self.clear_target()
+
 
     def dump_at_depot(self) -> None:
         """Empty the truck at the depot."""
-        pass
+        if not self.at_depot():
+            return
+        
+        if self.load <= 0:
+            return
+        
+        dumped = self.load
+        self.load = 0
+
+        self.model.total_dumped += dumped
 
     def clear_target(self) -> None:
         """Forget the current target bin and path."""
