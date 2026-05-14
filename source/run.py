@@ -13,7 +13,7 @@ def run_headless(steps: int = 100, width: int = 40, height: int = 40, humans: in
 
 
 def run_ui(steps: int = 100, width: int = 40, height: int = 40, humans: int = 50, seed: int = None, interval: int = 200, export: str = None, outfile: str = "out.gif"):
-    model = CityModel(width=width, height=height, n_humans=humans, seed=seed)
+    model = CityModel(width=width, height=height, n_humans=humans, n_trucks=3, seed=seed)
     animator = Animator(model=model, steps=steps, interval=interval)
     return animator.run(show=(export is None), export=export, outfile=outfile)
 
