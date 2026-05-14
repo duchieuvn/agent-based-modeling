@@ -1,6 +1,5 @@
 import argparse
-import matplotlib.pyplot as plt
-from visualization.plotter import Animator
+from visualization.pygame_visualizer import Animator
 
 from model import CityModel
 
