@@ -16,10 +16,7 @@ class CityModel(Model):
 
         self.city = CityMap(height, width, seed=seed)
 
-        if depot_pos is None:
-            depot_pos = (0, 0)
-        
-        self.depot = depot_pos
+        self.depot  = self.city.truck_spawn
 
         # place some bins on random passable cells
         for _ in range(max(1, (width * height) // 100)):
@@ -31,7 +28,6 @@ class CityModel(Model):
 
     def step(self):
         # Mesa 3.5.1: random activation via shuffle_do
-        self.claimed_bins.clear()
         self.agents.shuffle_do("step")
 
     def total_waste(self) -> int:
@@ -100,6 +96,7 @@ class CityModel(Model):
             'bins': bins,
             'agents': agents,
             'depot': (int(self.depot[0]), int(self.depot[1])),
+            'depot_cells': list(self.city.depot_cells),
             'metrics': metrics,
         }
 
