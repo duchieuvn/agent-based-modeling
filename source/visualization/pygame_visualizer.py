@@ -44,6 +44,7 @@ Color = Tuple[int, int, int]
 BACKGROUND_COLOR: Color = (26, 31, 34)
 ROAD_COLOR: Color = (212, 219, 224)
 BUILDING_COLOR: Color = (165, 176, 183)
+DEPOT_COLOR: Color = (255, 140, 0)
 GRID_LINE_COLOR: Color = (37, 43, 46)
 PANEL_COLOR: Color = (31, 36, 40)
 PANEL_TEXT_COLOR: Color = (235, 238, 240)
@@ -345,6 +346,7 @@ class PygameCityVisualizer:
         """Draw roads and buildings using tile images when possible."""
 
         street_mask = self.state["street_mask"]
+        depot_cells = set(map(tuple, self.state.get("depot_cells", [])))
         road_image = self.assets.get_image("road.png")
         building_image = self.assets.get_image("building.png")
 
@@ -352,8 +354,12 @@ class PygameCityVisualizer:
             for col in range(self.grid_width):
                 x, y = self._cell_to_screen(row, col)
                 is_street = bool(street_mask[row, col])
+                is_depot = (row, col) in depot_cells
 
-                if is_street:
+                if is_depot:
+                    image = None
+                    fallback_color = DEPOT_COLOR
+                elif is_street:
                     image = road_image
                     fallback_color = ROAD_COLOR
                 else:
