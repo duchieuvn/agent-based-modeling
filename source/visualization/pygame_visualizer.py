@@ -424,10 +424,6 @@ class PygameCityVisualizer:
         """Draw each agent at its (row, column) position."""
 
         human_size = int(self.tile_size * 0.78)
-        human_image = (
-            self.assets.get_image("human.png", size=(human_size, human_size))
-            or self.assets.get_image("down.png", size=(human_size, human_size))
-        )
 
         for _agent_id, _agent_type, position, _payload in self.state["agents"]:
             if position is None:
@@ -435,6 +431,11 @@ class PygameCityVisualizer:
 
             row, col = position
             x, y = self._centered_cell_rect(row, col, human_size)
+
+            if _agent_type == "TouristAgent":
+                human_image = self.assets.get_image("tourist/down.png", size=(human_size, human_size))
+            else:
+                human_image = self.assets.get_image("person/down.png", size=(human_size, human_size))
 
             if human_image is not None:
                 self.screen.blit(human_image, (x, y))
