@@ -233,13 +233,12 @@ class TruckAgent(Agent):
         self.model.total_dumped += dumped
 
     def clear_target(self) -> None:
-        """Forget the current target bin and path."""
-        if self.target_bin is not None:
-            self.model.claimed_bins.discard(self.target_bin)
+        if self.target_bin in self.model.claimed_bins:
+            self.model.claimed_bins.remove(self.target_bin)
+
         self.target_bin = None
         self.target_stop = None
         self.path = []
-        pass
 
     def step(self) -> None:
         """Main truck behavior called once per simulation step."""
