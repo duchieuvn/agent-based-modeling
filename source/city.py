@@ -16,9 +16,16 @@ class CityMap:
         else:
             assert street_mask.shape == (height, width)
             self.street = street_mask.astype(bool)
+        
         self.waste = np.zeros((height, width), dtype=int)
         self.bins = {}  # maps Coord -> {'capacity': int, 'load': int}
+
+        self.depot: Optional[Coord] = None
+        self.truck_spawn: Optional[Coord] = None
+        self.place_depot_station(size=3)
+        
         self._graph = None
+        
 
     def _generate_random_streets(self, prob_street=0.6) -> np.ndarray:
         # Generate horizontal and vertical streets per user's rules:
@@ -54,7 +61,43 @@ class CityMap:
 
         place_center_hall(street, min(11, self.height, self.width))
         return street
+    
 
+    def place_depot_station(self, size: int = 4) -> None:
+        """Place a depot building in the top-left and create a connected truck spawn."""
+
+        self.depot = (0, 0)
+        self.truck_spawn = None
+        self.depot_cells = set()
+
+        # 1. Create depot building block
+        for r in range(min(size, self.height)):
+            for c in range(min(size, self.width)):
+                self.street[r, c] = False
+                self.depot_cells.add((r, c))
+
+        # 2. Create a driveway/road below the depot
+        driveway_row = size
+
+        if driveway_row < self.height:
+            for c in range(0, min(size + 3, self.width)):
+                self.street[driveway_row, c] = True
+
+        # 3. Create a road on the right side of depot
+        driveway_col = size
+
+        if driveway_col < self.width:
+            for r in range(0, min(size + 3, self.height)):
+                self.street[r, driveway_col] = True
+
+        # 4. Truck spawn just below depot
+        preferred_spawn = (size, 1)
+
+        if self._in_bounds(*preferred_spawn):
+            self.street[preferred_spawn] = True
+            self.truck_spawn = preferred_spawn
+        else:
+            self.truck_spawn = self.random_passable_cell()
 
     def add_bin(self, coord: Coord, capacity: int = 50):
         self.bins[coord] = {'capacity': capacity, 'load': 0}
