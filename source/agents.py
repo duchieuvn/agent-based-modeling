@@ -74,6 +74,7 @@ class TruckAgent(Agent):
         self.target_bin: Optional[Coord] = None
         self.target_stop: Optional[Coord] = None
         self.path: List[Coord] = []
+        self.direction: Optional[Coord] = None
 
         self.full_threshold: float = full_threshold
 
@@ -130,6 +131,9 @@ class TruckAgent(Agent):
         best_distance: float = float("inf")
 
         for bin_coord, info in self.model.city.bins.items():
+            if bin_coord in self.model.claimed_bins:
+                continue
+
             capacity = info.get("capacity", 0)
             load = info.get("load", 0)
 
@@ -161,6 +165,9 @@ class TruckAgent(Agent):
         self.target_stop = best_stop
         self.path = best_path
 
+        if best_bin is not None:
+            self.model.claimed_bins.add(best_bin)
+
         return best_bin
     
     def plan_path_to(self, destination: Coord) -> None:
@@ -179,7 +186,9 @@ class TruckAgent(Agent):
             if not self.path:
                 break
 
-            self.pos = self.path.pop(0)
+            next_pos = self.path.pop(0)
+            self.direction = (next_pos[0] - self.pos[0], next_pos[1] - self.pos[1])
+            self.pos = next_pos
 
     def collect_from_target_bin(self) -> None:
         """Collect waste from the target bin into the truck."""
@@ -225,11 +234,38 @@ class TruckAgent(Agent):
 
     def clear_target(self) -> None:
         """Forget the current target bin and path."""
+        if self.target_bin is not None:
+            self.model.claimed_bins.discard(self.target_bin)
+        self.target_bin = None
+        self.target_stop = None
+        self.path = []
         pass
 
     def step(self) -> None:
         """Main truck behavior called once per simulation step."""
-        pass
+
+        if self.is_full():
+            if self.at_depot():
+                self.dump_at_depot()
+                self.clear_target()
+            else:
+                if not self.path:
+                    self.plan_path_to(self.depot)
+                self.move_along_path()
+            return
+        
+        if self.target_bin is not None:
+            if self.at_target_bin():
+                self.collect_from_target_bin()
+            else:
+                self.move_along_path()
+            return
+        
+        self.find_target_bin()
+
+        if self.target_bin is not None:
+            self.move_along_path()
+
 
     
         
