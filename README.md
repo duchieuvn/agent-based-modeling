@@ -18,30 +18,3 @@ Files:
 python -m pip install -r requirements.txt
 python run.py
 ```
-
-# UI Recommendation
-
-Short answer: start with Matplotlib for quick iteration, and use Dash + dash-cytoscape (or PyVis for a lighter web graph) for an interactive, NetworkX-friendly UI.
-
-- Matplotlib
-
-  Pros: very quick to implement, supports NetworkX drawing and heatmaps, low deps.
-
-  Use when: prototyping animation or exporting MP4/GIF.
-
-- Dash + dash-cytoscape (recommended for full interactive UI)
-
-  Pros: first-class browser UI, easy controls (start/stop/steps), live charts (Plotly), dash-cytoscape accepts NetworkX→Cytoscape JSON easily, good for dashboards and panels.
-
-  Use when: you want interactive exploration, controls, and charts in one app.
-
-- PyVis (lightweight alternative)  
-  Pros: simple NetworkX → interactive HTML (vis.js) with physics/layouts, minimal code.
-
-  Use when: you want an embeddable interactive graph view without building a full dashboard.
-
-- Holoviews + Datashader / Bokeh
-
-  Pros: best for very large graphs/heatmaps (fast rendering, zoom), integrates with NetworkX via conversion.
-
-  Use when: scale/performance for large maps matters.
