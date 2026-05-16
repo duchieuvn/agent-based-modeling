@@ -47,7 +47,7 @@ class CityMap:
         # Vertical streets (columns)
         min_vlen = int(np.ceil(0.3 * self.height))
         for c in range(self.width):
-            p = 0.7 if (c % 2 == 0) else 0.15
+            p = 0.7 if (c % 4 == 0) else 0.15
             if self.rng.random() < p:
                 length = int(self.rng.integers(min_vlen, self.height + 1))
                 start = int(self.rng.integers(0, self.height - length + 1))
@@ -177,3 +177,43 @@ class CityMap:
 
     def total_waste(self) -> int:
         return int(self.waste.sum() + sum(b['load'] for b in self.bins.values()))
+
+    def get_center_region(self) -> List[Coord]:
+        """Return passable coordinates inside the reserved center box."""
+        center_size = min(11, self.height, self.width)
+        center_r = (self.height - center_size) // 2
+        center_c = (self.width - center_size) // 2
+        coords = []
+        for r in range(center_r, center_r + center_size):
+            for c in range(center_c, center_c + center_size):
+                if self._in_bounds(r, c) and self.street[r, c]:
+                    coords.append((r, c))
+        return coords
+
+    def get_region_by_box(self, center: Coord, size: int) -> List[Coord]:
+        """Return passable coords in a square box of given size centered at `center`.
+
+        The returned list only contains passable (street) cells inside bounds.
+        """
+        cr, cc = center
+        half = size // 2
+        top = max(0, cr - half)
+        left = max(0, cc - half)
+        bottom = min(self.height, cr + half + (size % 2))
+        right = min(self.width, cc + half + (size % 2))
+        coords = []
+        for r in range(top, bottom):
+            for c in range(left, right):
+                if self.street[r, c]:
+                    coords.append((r, c))
+        return coords
+
+    def is_in_center(self, coord: Coord) -> bool:
+        """Return True if coord lies within the reserved center box (regardless of street).
+        Use this to check whether an agent is considered "in the center" area.
+        """
+        center_size = min(11, self.height, self.width)
+        center_r = (self.height - center_size) // 2
+        center_c = (self.width - center_size) // 2
+        r, c = coord
+        return center_r <= r < center_r + center_size and center_c <= c < center_c + center_size
