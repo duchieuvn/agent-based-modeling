@@ -383,6 +383,34 @@ class TruckAgent(Agent):
         if self.target_bin is not None:
             self.move_along_path()
 
+class PathPlanner(Agent):
+
+    def __init__(self, model):
+        super().__init__(model)
+
+    def plan_path_to(self, destination: Coord) -> None:
+        """Calculate and store a path to the destination."""
+        self.path = self.model.city.shortest_path(self.pos, destination)
+
+    def move_along_path(self) -> None:
+        """Move along the stored path according to truck speed."""
+        if not self.path:
+            return
+        
+        if self.path[0] == self.pos:
+            self.path.pop(0)
+
+        for _ in range(self.speed):
+            if not self.path:
+                break
+
+            next_pos = self.path.pop(0)
+            self.direction = (next_pos[0] - self.pos[0], next_pos[1] - self.pos[1])
+            self.pos = next_pos
+    
+
+
+
 
 class ServiceAgent(PathPlanner):
 
@@ -391,13 +419,140 @@ class ServiceAgent(PathPlanner):
         self.init_pos = model.city.random_passable_cell()
         self.pos = self.init_pos
 
-    def pick_waste(self):
-        pass
-    def empty_waste(self):
-        pass
-    def path
+        self.capacity = capacity
+        self.load: int = 0
 
+        self.speed: int = speed
+        self.path:List = []
+
+        self.direction: Optional[Coord] = None
+
+        self.random_patrol_enabled:bool = random_patrol
+
+        self.target_waste: Optional[Coord] = None
+        self.target_bin: Optional[Coord] = None
+
+    def remaining_capacity(self) -> int:
+        return self.capacity - self.load
     
+    def is_full(self)-> bool:
+        return self.load >= self.capacity
+    
+    def has_space(self) -> bool:
+        return self.remaining_capacity()>0
+    
+    def distance_to(self, coord: Coord) -> int:
+        r1, c1 = self.pos
+        r2, c2 = coord
+
+        return abs(r1 - r2) + abs(c1 - c2)
+    
+    def find_nearest_target(self, targets: List[Coord]) -> Optional[Coord]:
+        best_target: Optional[Coord] = None
+        best_path: List[Coord] = []
+        best_distance: float = float("inf")
+
+        for target in targets:
+            path = self.model.city.shortest_path(self.pos, target)
+
+            if not path:
+                continue
+
+            distance = len(path)
+
+            if distance < best_distance:
+                best_distance = distance
+                best_target = target
+                best_path = path
+
+        self.path = best_path
+
+        return best_target
+    
+    def find_nearest_waste(self) -> Optional[Coord]:
+        waste_cells = np.argwhere(self.model.city.waste > 0)
+
+        targets: List[Coord] = []
+
+        for r, c in waste_cells:
+            targets.append((int(r), int(c)))
+
+        self.target_waste = self.find_nearest_target(targets)
+
+        return self.target_waste
+    
+    def find_nearest_bin(self) -> Optional[Coord]:
+        targets: List[Coord] = []
+
+        for bin_coord, info in self.model.city.bins.items():
+            capacity = info.get("capacity", 0)
+            load = info.get("load", 0)
+
+            if capacity <= 0:
+                continue
+
+            if load >= capacity:
+                continue
+
+            targets.append(bin_coord)
+
+        self.target_bin = self.find_nearest_target(targets)
+
+        return self.target_bin
+    
+    def pick_waste(self) -> None:
+        if not self.has_space():
+            return
+
+        available = self.model.city.waste[self.pos]
+
+        if available <= 0:
+            return
+
+        space = self.remaining_capacity()
+        picked = min(available, space)
+
+        self.model.city.waste[self.pos] -= picked
+        self.load += picked
+
+        if self.model.city.waste[self.pos] <= 0:
+            self.target_waste = None
+    
+    def empty_waste(self) -> None:
+        if self.target_bin is None:
+            return
+
+        if self.pos != self.target_bin:
+            return
+
+        if self.load <= 0:
+            return
+
+        bin_info = self.model.city.bins.get(self.target_bin)
+
+        if bin_info is None:
+            self.target_bin = None
+            return
+
+        bin_capacity = bin_info.get("capacity", 0)
+        bin_load = bin_info.get("load", 0)
+
+        if bin_capacity <= 0:
+            return
+
+        bin_space = bin_capacity - bin_load
+
+        if bin_space <= 0:
+            return
+
+        dumped = min(self.load, bin_space)
+
+        bin_info["load"] += dumped
+        self.load -= dumped
+
+        if self.load <= 0:
+            self.target_bin = None
+            
     def random_patrol(self):
         pass
 
