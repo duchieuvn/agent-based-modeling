@@ -42,8 +42,8 @@ FPS = 60
 Color = Tuple[int, int, int]
 
 BACKGROUND_COLOR: Color = (26, 31, 34)
-ROAD_COLOR: Color = (212, 219, 224)
-BUILDING_COLOR: Color = (165, 176, 183)
+ROAD_COLOR: Color = (100, 120, 80)
+BUILDING_COLOR: Color = (90, 176, 90)
 DEPOT_COLOR: Color = (255, 140, 0)
 GRID_LINE_COLOR: Color = (37, 43, 46)
 PANEL_COLOR: Color = (31, 36, 40)
@@ -510,12 +510,13 @@ class PygameCityVisualizer:
             else:
                 human_image = self.assets.get_image("person/down.png", size=(human_size, human_size))
 
-                if human_image is not None:
-                    self.screen.blit(human_image, (x, y))
-                else:
-                    center = (x + human_size // 2, y + human_size // 2)
-                    pygame.draw.circle(self.screen, HUMAN_COLOR, center, human_size // 2)
-                    pygame.draw.circle(self.screen, (33, 35, 36), center, human_size // 2, 2)
+            if human_image is not None:
+                self.screen.blit(human_image, (x, y))
+            else:
+                center = (x + human_size // 2, y + human_size // 2)
+                pygame.draw.circle(self.screen, HUMAN_COLOR, center, human_size // 2)
+                pygame.draw.circle(self.screen, (33, 35, 36), center, human_size // 2, 2)
+    
     def _draw_load_bar(self, row: int, col: int, fill_ratio: float) -> None:
         """Draw a small load bar above a truck."""
 
