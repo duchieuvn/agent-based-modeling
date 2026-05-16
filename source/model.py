@@ -1,7 +1,6 @@
 from mesa import Model
 from city import CityMap
 from agents import LocalAgent, TruckAgent, TouristAgent
-from bins import Bin
 import numpy as np
 from typing import Dict, List, Any, Tuple, Optional
 
@@ -18,18 +17,48 @@ class CityModel(Model):
 
         self.depot  = self.city.truck_spawn
 
-        # place some bins on random passable cells
-        for _ in range(max(1, (width * height) // 100)):
-            coord = self.city.random_passable_cell()
-            self.city.add_bin(coord, capacity=100)
         # create human agents using Mesa 3.5.1 factory method
         LocalAgent.create_agents(model=self, n=n_humans)
+
+        # place the first bins at the initial positions of the first LocalAgents
+        # so the simulation starts with bins anchored to the local population.
+        bin_count = max(1, (width * height) // 100)
+        local_agents = sorted(
+            (agent for agent in self.agents if isinstance(agent, LocalAgent)),
+            key=lambda agent: agent.unique_id,
+        )
+
+        for agent in local_agents[:bin_count]:
+            self.city.add_bin(agent.init_pos, capacity=100)
+
+        while len(self.city.bins) < bin_count:
+            coord = self.city.random_passable_cell()
+            if coord in self.city.bins:
+                continue
+            self.city.add_bin(coord, capacity=100)
+
         TouristAgent.create_agents(model=self, n=int(n_humans*1.5))
         TruckAgent.create_agents(model=self, n=n_trucks, depot=self.depot, capacity = 500, speed = 1, full_threshold = 0.8)
 
     def step(self):
         # Mesa 3.5.1: random activation via shuffle_do
         self.agents.shuffle_do("step")
+
+    def local_density(self, coord: Tuple[int, int], radius: int = 2) -> int:
+        """Return the number of agents within Manhattan `radius` of `coord`.
+
+        This counts all agents that have a `.pos` attribute and are within
+        the given Manhattan distance. Use this as a lightweight crowd signal.
+        """
+        r, c = coord
+        count = 0
+        for a in list(self.agents):
+            pos = getattr(a, "pos", None)
+            if pos is None:
+                continue
+            if abs(pos[0] - r) + abs(pos[1] - c) <= radius:
+                count += 1
+        return count
 
     def total_waste(self) -> int:
         return self.city.total_waste()
