@@ -1,12 +1,12 @@
 from mesa import Model
 from city import CityMap
-from agents import LocalAgent, TruckAgent, TouristAgent
+from agents import LocalAgent, TruckAgent, TouristAgent, ServiceAgent
 import numpy as np
 from typing import Dict, List, Any, Tuple, Optional
 
 
 class CityModel(Model):
-    def __init__(self, width: int = 50, height: int = 50, n_humans: int = 20, n_trucks: int = 1, depot_pos = None, seed: int = None):
+    def __init__(self, width: int = 50, height: int = 50, n_humans: int = 20, n_trucks: int = 1, n_service: int = 20, depot_pos = None, seed: int = None):
         super().__init__(seed=seed)
         self.width = width
         self.height = height
@@ -39,6 +39,7 @@ class CityModel(Model):
 
         TouristAgent.create_agents(model=self, n=int(n_humans*1.5))
         TruckAgent.create_agents(model=self, n=n_trucks, depot=self.depot, capacity = 500, speed = 1, full_threshold = 0.8)
+        ServiceAgent.create_agents(model=self, n=n_service, capacity=100, speed=1, behavior = "nearest")
 
     def step(self):
         # Mesa 3.5.1: random activation via shuffle_do
@@ -103,6 +104,16 @@ class CityModel(Model):
                 payload["target_stop"] = a.target_stop
                 payload["path_length"] = len(a.path)
                 payload["direction"] = a.direction
+
+            # ServiceAgent info
+            if atype == "ServiceAgent":
+                payload["load"] = int(getattr(a, "load", 0))
+                payload["capacity"] = int(getattr(a, "capacity", 0))
+                payload["speed"] = int(getattr(a, "speed", 1)) if hasattr(a, "speed") else 1
+                payload["target_waste"] = getattr(a, "target_waste", None)
+                payload["target_bin"] = getattr(a, "target_bin", None)
+                payload["path_length"] = len(getattr(a, "path", []))
+                payload["direction"] = getattr(a, "direction", None)
             
             agents.append(
                 (
