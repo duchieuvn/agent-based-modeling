@@ -384,9 +384,12 @@ class TruckAgent(Agent):
             self.move_along_path()
 
 class PathPlanner(Agent):
-
-    def __init__(self, model):
+    def __init__(self, model, speed: int = 1):
         super().__init__(model)
+        # routing state owned by the planner
+        self.path: List[Coord] = []
+        self.direction: Optional[Coord] = None
+        self.speed: int = speed
 
     def plan_path_to(self, destination: Coord) -> None:
         """Calculate and store a path to the destination."""
@@ -414,20 +417,15 @@ class PathPlanner(Agent):
 
 class ServiceAgent(PathPlanner):
 
-    def __init__(self, model, capacity, speed:int=1, random_patrol:bool=True):
-        super().__init__(model)
+    def __init__(self, model, capacity, speed:int=1, behavior:str = "nearest"):
+        super().__init__(model, speed=speed)
         self.init_pos = model.city.random_passable_cell()
         self.pos = self.init_pos
 
         self.capacity = capacity
         self.load: int = 0
 
-        self.speed: int = speed
-        self.path:List = []
-
-        self.direction: Optional[Coord] = None
-
-        self.random_patrol_enabled:bool = random_patrol
+        self.behavior: str = behavior
 
         self.target_waste: Optional[Coord] = None
         self.target_bin: Optional[Coord] = None
@@ -477,7 +475,19 @@ class ServiceAgent(PathPlanner):
         for r, c in waste_cells:
             targets.append((int(r), int(c)))
 
-        self.target_waste = self.find_nearest_target(targets)
+        if not targets:
+            self.target_waste = None
+            self.path = []
+            return None
+
+        # Cheap first filter: sort by Manhattan distance
+        targets.sort(key=lambda coord: self.distance_to(coord))
+
+        # Expensive check only for a few nearby candidates
+        max_candidates = 5
+        nearby_targets = targets[:max_candidates]
+
+        self.target_waste = self.find_nearest_target(nearby_targets)
 
         return self.target_waste
     
@@ -494,9 +504,19 @@ class ServiceAgent(PathPlanner):
             if load >= capacity:
                 continue
 
+            # skip bins already claimed by other agents
+            if bin_coord in getattr(self.model, "claimed_bins", set()):
+                continue
+
             targets.append(bin_coord)
 
         self.target_bin = self.find_nearest_target(targets)
+
+        # claim the bin so other agents avoid it
+        if self.target_bin is not None:
+            if not hasattr(self.model, "claimed_bins"):
+                self.model.claimed_bins = set()
+            self.model.claimed_bins.add(self.target_bin)
 
         return self.target_bin
     
@@ -528,33 +548,96 @@ class ServiceAgent(PathPlanner):
         if self.load <= 0:
             return
 
+        # use CityMap.deposit_to_bin to preserve overflow semantics
+        deposited = self.model.city.deposit_to_bin(self.target_bin, int(self.load))
+        self.load -= deposited
+
+        # release claim if bin no longer has space or we've emptied robot
         bin_info = self.model.city.bins.get(self.target_bin)
+        if self.target_bin in getattr(self.model, "claimed_bins", set()):
+            # if bin is now full, or we finished unloading, release claim
+            if bin_info is None or bin_info.get("load", 0) >= bin_info.get("capacity", 0) or self.load <= 0:
+                self.model.claimed_bins.discard(self.target_bin)
+                if self.load <= 0:
+                    self.target_bin = None
 
-        if bin_info is None:
-            self.target_bin = None
+    def at_target_waste(self) -> bool:
+        return self.target_waste is not None and self.pos == self.target_waste
+    
+    def at_target_bin(self) -> bool:
+        return self.target_bin is not None and self.pos == self.target_bin
+    
+    def clear_targets(self) -> None:
+        self.target_waste = None
+        self.target_bin = None
+        self.path = []
+    
+    def random_patrol(self) -> None:
+        neighbors = self.model.city.get_neighbors(self.pos)
+
+        if not neighbors:
             return
 
-        bin_capacity = bin_info.get("capacity", 0)
-        bin_load = bin_info.get("load", 0)
+        next_pos = self.random.choice(neighbors)
 
-        if bin_capacity <= 0:
+        self.direction = (
+            next_pos[0] - self.pos[0],
+            next_pos[1] - self.pos[1]
+        )
+
+        self.pos = next_pos
+
+    def collect_behavior(self) -> None:
+        if self.behavior == "random":
+            self.random_collect_behavior()
+
+        elif self.behavior == "nearest":
+            self.nearest_waste_behavior()
+
+        else:
+            raise ValueError(f"Unknown ServiceAgent behavior: {self.behavior}")    
+
+    def random_collect_behavior(self) -> None:
+        # If standing on waste, collect it
+        if self.model.city.waste[self.pos] > 0:
+            self.pick_waste()
             return
 
-        bin_space = bin_capacity - bin_load
+        # Otherwise move randomly
+        self.random_patrol()
 
-        if bin_space <= 0:
+        # After moving, check again if new cell has waste
+        if self.model.city.waste[self.pos] > 0:
+            self.pick_waste()
+
+    def nearest_waste_behavior(self) -> None:
+        if self.target_waste is not None:
+            if self.at_target_waste():
+                self.pick_waste()
+            else:
+                self.move_along_path()
             return
 
-        dumped = min(self.load, bin_space)
+        self.find_nearest_waste()
 
-        bin_info["load"] += dumped
-        self.load -= dumped
+        if self.target_waste is not None:
+            self.move_along_path()   
 
-        if self.load <= 0:
-            self.target_bin = None
-            
-    def random_patrol(self):
-        pass
+    def step(self) -> None:
+        # Case 1: if robot is full, go to nearest bin and empty
+        if self.is_full():
+            if self.target_bin is None:
+                self.find_nearest_bin()
 
-    def nearest_waste_patrol(self):
-        pass
+            if self.target_bin is None:
+                return
+
+            if self.at_target_bin():
+                self.empty_waste()
+            else:
+                self.move_along_path()
+
+            return
+
+        # Case 2: if robot is not full, use selected collection behavior
+        self.collect_behavior()
