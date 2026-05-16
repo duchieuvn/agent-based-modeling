@@ -128,6 +128,7 @@ class PygameCityVisualizer:
         height: int = 20,
         n_humans: int = 20,
         n_trucks: int = 1,
+        n_service: int = 20,
         seed: Optional[int] = None,
         tile_size: int = TILE_SIZE,
     ):
@@ -138,6 +139,7 @@ class PygameCityVisualizer:
             "height": height,
             "n_humans": n_humans,
             "n_trucks": n_trucks,
+            "n_service": n_service,
             "seed": seed,
         }
         self.tile_size = tile_size
@@ -186,12 +188,14 @@ class PygameCityVisualizer:
 
         n_humans = sum(1 for a in agents if a.__class__.__name__ == "LocalAgent")
         n_trucks = sum(1 for a in agents if a.__class__.__name__ == "TruckAgent")
+        n_service = sum(1 for a in agents if a.__class__.__name__ == "ServiceAgent")
 
         return {
             "width": int(getattr(model, "width", 20)),
             "height": int(getattr(model, "height", 20)),
             "n_humans": n_humans,
             "n_trucks": n_trucks,
+            "n_service": n_service,
             "seed": None,
         }
 
@@ -459,6 +463,11 @@ class PygameCityVisualizer:
             or self.assets.get_image("down.png", size=(human_size, human_size))
         )
 
+        service_image = (
+            self.assets.get_image("service.png", size=(human_size, human_size))
+            or self.assets.get_image("cleaner.png", size=(human_size, human_size))
+        )
+
         truck_image = (
             self.assets.get_image("truck.png", size=(truck_size, truck_size))
             or self.assets.get_image("garbage_truck.png", size=(truck_size, truck_size))
@@ -501,6 +510,47 @@ class PygameCityVisualizer:
                 load = int(payload.get("load", 0))
                 fill_ratio = max(0.0, min(1.0, load / capacity))
                 self._draw_load_bar(row, col, fill_ratio)
+                continue
+
+            elif agent_type == "ServiceAgent":
+                # draw service agent image or fallback
+                x, y = self._centered_cell_rect(row, col, human_size)
+                image = service_image
+                if image is not None:
+                    self.screen.blit(image, (x, y))
+                else:
+                    center = (x + human_size // 2, y + human_size // 2)
+                    pygame.draw.circle(self.screen, (60, 180, 120), center, human_size // 2)
+                    pygame.draw.circle(self.screen, (20, 24, 26), center, human_size // 2, 2)
+
+                # draw load bar similar to truck but different color
+                capacity = max(1, int(payload.get("capacity", 1)))
+                load = int(payload.get("load", 0))
+                fill_ratio = max(0.0, min(1.0, load / capacity))
+                if self.tile_size >= 16:
+                    # draw smaller load bar just below the agent
+                    tile_x, tile_y = self._cell_to_screen(row, col)
+                    bar_w = int(self.tile_size * 0.6)
+                    bar_h = max(3, int(self.tile_size * 0.10))
+                    bx = tile_x + (self.tile_size - bar_w) // 2
+                    by = tile_y + self.tile_size - bar_h - 2
+                    bg = pygame.Rect(bx, by, bar_w, bar_h)
+                    fg = pygame.Rect(bx, by, int(bar_w * fill_ratio), bar_h)
+                    pygame.draw.rect(self.screen, (40, 44, 46), bg)
+                    pygame.draw.rect(self.screen, (100, 220, 140), fg)
+                    pygame.draw.rect(self.screen, (10, 12, 14), bg, 1)
+
+                # draw target bin marker if present
+                target_bin = payload.get("target_bin")
+                if target_bin is not None:
+                    try:
+                        tr, tc = target_bin
+                        tx, ty = self._centered_cell_rect(tr, tc, max(6, self.tile_size // 4))
+                        marker = pygame.Rect(tx, ty, max(6, self.tile_size // 4), max(6, self.tile_size // 4))
+                        pygame.draw.rect(self.screen, (255, 200, 80), marker, 2)
+                    except Exception:
+                        pass
+                continue
 
             else:
                 x, y = self._centered_cell_rect(row, col, human_size)
