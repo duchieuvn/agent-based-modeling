@@ -28,6 +28,14 @@ class Animator:
         else:
             return "red"
 
+    def _get_agent_color(self, agent_type):
+        """Return color based on agent type."""
+        if agent_type == "LocalAgent":
+            return "dodgerblue"
+        if agent_type == "TouristAgent":
+            return "tomato"
+        return "gray"
+
     def _ensure_axes(self):
         if self.fig is not None and self.ax is not None:
             return
@@ -83,15 +91,19 @@ class Animator:
 
         agents = state.get("agents", [])
         agent_positions = []
+        agent_colors = []
         for (_id, _atype, pos, _payload) in agents:
             if pos is None:
                 continue
             r, c = pos
             agent_positions.append((c, r))
+            agent_colors.append(self._get_agent_color(_atype))
         if agent_positions:
             self._agents_scatter.set_offsets(np.array(agent_positions))
+            self._agents_scatter.set_color(agent_colors)
         else:
             self._agents_scatter.set_offsets(np.empty((0, 2)))
+            self._agents_scatter.set_color([])
 
         metrics = state.get("metrics", {})
         self._title.set_text(

@@ -3,14 +3,36 @@ from typing import Optional, Tuple, List
 
 Coord = Tuple[int, int]
 
-class LocalAgent(Agent):
+class Human(Agent):
     """Simple human that moves randomly on streets and occasionally litters."""
 
-    def __init__(self, model, p_litter: float = 0.7, keep_direction_prob: float = 0.65, max_wander_distance: Optional[int] = None):
+    def __init__(self, model, p_litter: float = 0.7):
         super().__init__(model)
         self.init_pos = model.city.random_passable_cell()
         self.pos = self.init_pos
         self.p_litter = p_litter
+
+    def litter(self):
+        # If a bin is close enough, deposit there; otherwise litter on the street.
+        nearby_bin = None
+        nearby_distance = None
+        for bin_coord in self.model.city.bins.keys():
+            distance = abs(self.pos[0] - bin_coord[0]) + abs(self.pos[1] - bin_coord[1])
+            if distance <= 3 and (nearby_distance is None or distance < nearby_distance):
+                nearby_bin = bin_coord
+                nearby_distance = distance
+
+        if self.random.random() < self.p_litter:
+            if nearby_bin is not None:
+                self.model.city.deposit_to_bin(nearby_bin, 1)
+            else:
+                self.model.city.add_waste(self.pos, 1)
+
+class LocalAgent(Human):
+    """Simple human that moves randomly on streets and occasionally litters."""
+
+    def __init__(self, model, p_litter: float = 0.7, keep_direction_prob: float = 0.65, max_wander_distance: Optional[int] = None):
+        super().__init__(model, p_litter)
         self.keep_direction_prob = keep_direction_prob
         # Use Manhattan radius to keep the agent from wandering too far from start.
         if max_wander_distance is None:
@@ -55,8 +77,17 @@ class LocalAgent(Agent):
             else:
                 self.model.city.add_waste(self.pos, 1)
 
+class TouristAgent(Human):
+    def __init__(self, model, p_litter: float = 0.7):
+        super().__init__(model, p_litter=p_litter)
 
+    def step(self):
+        # Move randomly without directional persistence.
+        neighbors = self.model.city.get_neighbors(self.pos)
+        if neighbors:
+            self.pos = self.random.choice(neighbors)
 
+        self.litter()
 
 class TruckAgent(Agent):
 
@@ -265,6 +296,3 @@ class TruckAgent(Agent):
         if self.target_bin is not None:
             self.move_along_path()
 
-
-    
-        

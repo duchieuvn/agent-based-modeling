@@ -1,6 +1,6 @@
 from mesa import Model
 from city import CityMap
-from agents import LocalAgent, TruckAgent
+from agents import LocalAgent, TruckAgent, TouristAgent
 from bins import Bin
 import numpy as np
 from typing import Dict, List, Any, Tuple, Optional
@@ -24,6 +24,7 @@ class CityModel(Model):
             self.city.add_bin(coord, capacity=100)
         # create human agents using Mesa 3.5.1 factory method
         LocalAgent.create_agents(model=self, n=n_humans)
+        TouristAgent.create_agents(model=self, n=n_humans // 2)
         TruckAgent.create_agents(model=self, n=n_trucks, depot=self.depot, capacity = 500, speed = 1, full_threshold = 0.8)
 
     def step(self):
