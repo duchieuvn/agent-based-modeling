@@ -383,3 +383,23 @@ class TruckAgent(Agent):
         if self.target_bin is not None:
             self.move_along_path()
 
+
+class ServiceAgent(PathPlanner):
+
+    def __init__(self, model, capacity, speed:int=1, random_patrol:bool=True):
+        super().__init__(model)
+        self.init_pos = model.city.random_passable_cell()
+        self.pos = self.init_pos
+
+    def pick_waste(self):
+        pass
+    def empty_waste(self):
+        pass
+    def path
+
+    
+    def random_patrol(self):
+        pass
+
+    def nearest_waste_patrol(self):
+        pass
