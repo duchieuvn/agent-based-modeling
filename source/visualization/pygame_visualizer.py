@@ -42,8 +42,9 @@ FPS = 60
 Color = Tuple[int, int, int]
 
 BACKGROUND_COLOR: Color = (26, 31, 34)
-ROAD_COLOR: Color = (78, 86, 90)
-BUILDING_COLOR: Color = (52, 66, 72)
+ROAD_COLOR: Color = (212, 219, 224)
+BUILDING_COLOR: Color = (165, 176, 183)
+DEPOT_COLOR: Color = (255, 140, 0)
 GRID_LINE_COLOR: Color = (37, 43, 46)
 PANEL_COLOR: Color = (31, 36, 40)
 PANEL_TEXT_COLOR: Color = (235, 238, 240)
@@ -126,6 +127,7 @@ class PygameCityVisualizer:
         width: int = 20,
         height: int = 20,
         n_humans: int = 20,
+        n_trucks: int = 1,
         seed: Optional[int] = None,
         tile_size: int = TILE_SIZE,
     ):
@@ -135,6 +137,7 @@ class PygameCityVisualizer:
             "width": width,
             "height": height,
             "n_humans": n_humans,
+            "n_trucks": n_trucks,
             "seed": seed,
         }
         self.tile_size = tile_size
@@ -179,17 +182,16 @@ class PygameCityVisualizer:
         return CityModel(**self.model_config)
 
     def _model_config_from_existing_model(self, model: CityModel) -> dict:
-        """Build a reset configuration from a model created elsewhere.
+        agents = list(getattr(model, "agents", []))
 
-        run.py owns the model creation path, so the visualizer receives an
-        already-built CityModel. For the R key reset, we copy the model's public
-        width/height and current agent count into a new CityModel.
-        """
+        n_humans = sum(1 for a in agents if a.__class__.__name__ == "LocalAgent")
+        n_trucks = sum(1 for a in agents if a.__class__.__name__ == "TruckAgent")
 
         return {
             "width": int(getattr(model, "width", 20)),
             "height": int(getattr(model, "height", 20)),
-            "n_humans": len(getattr(model, "agents", [])),
+            "n_humans": n_humans,
+            "n_trucks": n_trucks,
             "seed": None,
         }
 
@@ -313,16 +315,38 @@ class PygameCityVisualizer:
 
         self.screen.fill(BACKGROUND_COLOR)
         self._draw_city_tiles()
+        self._draw_depot()
         self._draw_waste()
         self._draw_bins()
         self._draw_agents()
         self._draw_info_panel()
         pygame.display.flip()
 
+    def _draw_depot(self) -> None:
+        """Draw the common dumping depot."""
+        depot = self.state.get("depot")
+        if depot is None:
+            return
+
+        row, col = depot
+        size = int(self.tile_size * 0.9)
+        x, y = self._centered_cell_rect(row, col, size)
+
+        depot_image = self.assets.get_image("depot.png", size=(size, size))
+
+        if depot_image is not None:
+            self.screen.blit(depot_image, (x, y))
+        else:
+            rect = pygame.Rect(x, y, size, size)
+            pygame.draw.rect(self.screen, (160, 100, 220), rect, border_radius=4)
+            pygame.draw.rect(self.screen, (30, 30, 35), rect, 2, border_radius=4)
+            self._draw_centered_text("D", row, col, self.small_font)
+        
     def _draw_city_tiles(self) -> None:
         """Draw roads and buildings using tile images when possible."""
 
         street_mask = self.state["street_mask"]
+        depot_cells = set(map(tuple, self.state.get("depot_cells", [])))
         road_image = self.assets.get_image("road.png")
         building_image = self.assets.get_image("building.png")
 
@@ -330,8 +354,12 @@ class PygameCityVisualizer:
             for col in range(self.grid_width):
                 x, y = self._cell_to_screen(row, col)
                 is_street = bool(street_mask[row, col])
+                is_depot = (row, col) in depot_cells
 
-                if is_street:
+                if is_depot:
+                    image = None
+                    fallback_color = DEPOT_COLOR
+                elif is_street:
                     image = road_image
                     fallback_color = ROAD_COLOR
                 else:
@@ -421,28 +449,93 @@ class PygameCityVisualizer:
                 pygame.draw.rect(self.screen, (20, 24, 26), rect)
 
     def _draw_agents(self) -> None:
-        """Draw each agent at its (row, column) position."""
+        """Draw humans and trucks at their grid positions."""
 
         human_size = int(self.tile_size * 0.78)
+        truck_size = int(self.tile_size * 0.95)
 
-        for _agent_id, _agent_type, position, _payload in self.state["agents"]:
+        human_image = (
+            self.assets.get_image("human.png", size=(human_size, human_size))
+            or self.assets.get_image("down.png", size=(human_size, human_size))
+        )
+
+        truck_image = (
+            self.assets.get_image("truck.png", size=(truck_size, truck_size))
+            or self.assets.get_image("garbage_truck.png", size=(truck_size, truck_size))
+            or self.assets.get_image("van.png", size=(truck_size, truck_size))
+        )
+
+        truck_direction_images = {
+            (-1, 0): self.assets.get_image("truck_up.png", size=(truck_size, truck_size)),
+            (1, 0): self.assets.get_image("truck_down.png", size=(truck_size, truck_size)),
+            (0, -1): self.assets.get_image("truck_left.png", size=(truck_size, truck_size)),
+            (0, 1): self.assets.get_image("truck_right.png", size=(truck_size, truck_size)),
+        }
+
+        for agent_id, agent_type, position, payload in self.state["agents"]:
             if position is None:
                 continue
 
             row, col = position
-            x, y = self._centered_cell_rect(row, col, human_size)
 
-            if _agent_type == "TouristAgent":
+            if agent_type == "TruckAgent":
+                x, y = self._centered_cell_rect(row, col, truck_size)
+                direction = payload.get("direction")
+                image = truck_direction_images.get(direction, truck_image)
+
+                if image is not None:
+                    self.screen.blit(image, (x, y))
+                else:
+                    rect = pygame.Rect(x, y, truck_size, truck_size)
+                    pygame.draw.rect(self.screen, (80, 170, 230), rect, border_radius=4)
+                    pygame.draw.rect(self.screen, (20, 24, 26), rect, 2, border_radius=4)
+
+                    if self.tile_size >= 18:
+                        load = payload.get("load", 0)
+                        capacity = payload.get("capacity", 1)
+                        text = f"T {load}/{capacity}"
+                        self._draw_centered_text("T", row, col, self.small_font)
+
+                # Optional: draw a small load bar above truck
+                capacity = max(1, int(payload.get("capacity", 1)))
+                load = int(payload.get("load", 0))
+                fill_ratio = max(0.0, min(1.0, load / capacity))
+                self._draw_load_bar(row, col, fill_ratio)
+
+            else:
+                x, y = self._centered_cell_rect(row, col, human_size)
+
+            if agent_type == "TouristAgent":
                 human_image = self.assets.get_image("tourist/down.png", size=(human_size, human_size))
             else:
                 human_image = self.assets.get_image("person/down.png", size=(human_size, human_size))
 
-            if human_image is not None:
-                self.screen.blit(human_image, (x, y))
-            else:
-                center = (x + human_size // 2, y + human_size // 2)
-                pygame.draw.circle(self.screen, HUMAN_COLOR, center, human_size // 2)
-                pygame.draw.circle(self.screen, (33, 35, 36), center, human_size // 2, 2)
+                if human_image is not None:
+                    self.screen.blit(human_image, (x, y))
+                else:
+                    center = (x + human_size // 2, y + human_size // 2)
+                    pygame.draw.circle(self.screen, HUMAN_COLOR, center, human_size // 2)
+                    pygame.draw.circle(self.screen, (33, 35, 36), center, human_size // 2, 2)
+    def _draw_load_bar(self, row: int, col: int, fill_ratio: float) -> None:
+        """Draw a small load bar above a truck."""
+
+        if self.tile_size < 16:
+            return
+
+        tile_x, tile_y = self._cell_to_screen(row, col)
+
+        bar_width = int(self.tile_size * 0.8)
+        bar_height = max(3, int(self.tile_size * 0.12))
+
+        x = tile_x + (self.tile_size - bar_width) // 2
+        y = tile_y + 2
+
+        bg_rect = pygame.Rect(x, y, bar_width, bar_height)
+        fill_rect = pygame.Rect(x, y, int(bar_width * fill_ratio), bar_height)
+
+        pygame.draw.rect(self.screen, (35, 38, 40), bg_rect)
+        pygame.draw.rect(self.screen, (120, 220, 120), fill_rect)
+        pygame.draw.rect(self.screen, (10, 12, 14), bg_rect, 1)
 
     def _draw_info_panel(self) -> None:
         """Draw a simple side panel with current controls and metrics."""
@@ -459,6 +552,7 @@ class PygameCityVisualizer:
             ("", PANEL_MUTED_TEXT_COLOR, self.small_font),
             (f"Time: {metrics.get('time', self.state.get('time', 0)):.1f}", PANEL_TEXT_COLOR, self.font),
             (f"Total waste: {metrics.get('total_waste', 0)}", PANEL_TEXT_COLOR, self.font),
+            (f"Dumped: {metrics.get('total_dumped', 0)}", PANEL_TEXT_COLOR, self.font),
             (f"Agents: {metrics.get('num_agents', 0)}", PANEL_TEXT_COLOR, self.font),
             (f"Speed: {self.steps_per_second} step/s", PANEL_TEXT_COLOR, self.font),
             (f"Zoom: {self.tile_size}px/cell", PANEL_TEXT_COLOR, self.font),
